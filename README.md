@@ -1,5 +1,5 @@
 # blen
-Blen is the N-th Bluetoot Low Enery library.
+Blen is the Bluetooth Low Energy N-th library, for Android API 21 as minimum.
 
 It's customizable with two standard Java Observer, one for device scanning, the other one for device connection lifecycle.
 
