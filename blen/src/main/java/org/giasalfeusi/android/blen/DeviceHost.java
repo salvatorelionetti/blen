@@ -11,15 +11,21 @@ import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Observer;
 
 /**
  * Created by salvy on 10/03/17.
  */
 
-public class DeviceHost {
+public class DeviceHost
+{
+    static private final String TAG = "DevHost";
+
     /*
      * Android force to have a Context to interact with itself.
      * Unfortunately Context is a 'base class' of an Activity hence
@@ -37,14 +43,27 @@ public class DeviceHost {
     private ScanSettings settings;
     private List<ScanFilter> filters;
     private BluetoothGatt mGatt;
+    private DevicesList devicesList;
 
+    private ObservableAllPublic observable = null;
+
+    /* Don't save the context */
     public DeviceHost(Context context)
     {
         final BluetoothManager bluetoothManager =
                 (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
+        BluetoothDevice[] _devices = {};
+        devicesList = new DevicesList(Arrays.asList(_devices), this);
+        observable = new ObservableAllPublic();
     }
 
+    public DevicesList getDevicesList()
+    {
+        return devicesList;
+    }
+
+    /* Don't save Context */
     public Boolean hasBluetoothLE(Context context)
     {
         return context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
@@ -62,15 +81,19 @@ public class DeviceHost {
 
     public void startScan(DeviceScanCallBack deviceScanCallBack)
     {
-            if (Build.VERSION.SDK_INT >= 21) {
-                mLEScanner = mBluetoothAdapter.getBluetoothLeScanner();
-                settings = new ScanSettings.Builder()
-                        .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                        .build();
-                filters = new ArrayList<ScanFilter>();
-            }
-            scanLeDevice(Boolean.TRUE, deviceScanCallBack);
+        if (Build.VERSION.SDK_INT >= 21) {
+            mLEScanner = mBluetoothAdapter.getBluetoothLeScanner();
+            settings = new ScanSettings.Builder()
+                    .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    .build();
+            filters = new ArrayList<ScanFilter>();
         }
+        else
+        {
+            Log.e(TAG, String.format("startScan: NOT IMPLEMENTED on %d", Build.VERSION.SDK_INT));
+        }
+        scanLeDevice(Boolean.TRUE, deviceScanCallBack);
+    }
 
     public void stopScan(DeviceScanCallBack deviceScanCallBack)
     {
@@ -88,7 +111,8 @@ public class DeviceHost {
         mGatt = null;
     }
 
-    private void scanLeDevice(final Boolean enable, DeviceScanCallBack mScanCallBack) {
+    private void scanLeDevice(final Boolean enable, DeviceScanCallBack mScanCallBack)
+    {
         if (enable) {
             if (Build.VERSION.SDK_INT < 21) {
                 //mBluetoothAdapter.startLeScan(mLeScanCallBack);
@@ -108,10 +132,33 @@ public class DeviceHost {
         }
     }
 
-    public void connectToDevice(BluetoothDevice device, DeviceGattCallBack gattCallBack, Activity activity, DeviceScanCallBack deviceScanCallBack) {
-        if (mGatt == null) {
+    public void connectToDevice(BluetoothDevice device, DeviceGattCallBack gattCallBack, Activity activity, DeviceScanCallBack deviceScanCallBack)
+    {
+        if (mGatt == null)
+        {
             mGatt = device.connectGatt(activity, false, gattCallBack);
             scanLeDevice(Boolean.FALSE, deviceScanCallBack);// will stop after first device detection
         }
+    }
+
+    /* TODO: Not so good, all public */
+    public void notifyChanged(Object o)
+    {
+        Log.i(TAG, String.format("notifyChanged count %d, %s", observable.countObservers(), o));
+        observable.setChanged();
+        observable.notifyObservers(o);
+    }
+
+    /* The proxy part */
+    public void addObserver(Observer observer)
+    {
+        Log.i(TAG, String.format("addObserver %s", observer));
+        observable.addObserver(observer);
+    }
+
+    public void delObserver(Observer observer)
+    {
+        Log.i(TAG, String.format("delObserver %s", observer));
+        observable.deleteObserver(observer);
     }
 }

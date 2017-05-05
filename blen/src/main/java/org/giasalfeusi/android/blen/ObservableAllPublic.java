@@ -1,7 +1,5 @@
 package org.giasalfeusi.android.blen;
 
-import android.util.Log;
-
 import java.util.Observable;
 
 /**
@@ -9,6 +7,10 @@ import java.util.Observable;
  */
 
 /* To let to operate on Observable object with inheriting from it */
+/* TODO Add an 2 phase notification
+ * 1) Notify, no state is changed (e.g. validate an action and schedule the execution)
+ * 2) Execute state change (e.g. connect)
+ */
 class ObservableAllPublic extends Observable {
     final static private String TAG = "ObservableAP";
 

@@ -1,9 +1,10 @@
 package org.giasalfeusi.android.blen;
 
-import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.util.Log;
 
@@ -20,39 +21,43 @@ public class Orchestrator {
     static final private String TAG = "STagOrch";
     static Orchestrator sto;
 
-    private DeviceScanCallBack deviceScanCallBack;
     private DeviceHost deviceHost;
-    private Context context; // AAARGH!
+    private DeviceScanCallBack deviceScanCallBack;
     private HashMap<BluetoothDevice, DeviceWithObservers> deviceWithObserversMap;
 
-    static public Orchestrator singleton()
+    /* Required only once. Could be safely called multiple times */
+    static public Orchestrator singletonInitialize(Context context)
     {
-        /* Ensure used objects are created too */
-        DevicesList.singleton();
-        DeviceBook.singleton();
-
-        if (sto == null) {
-            sto = new Orchestrator();
+        if (sto == null)
+        {
+            sto = new Orchestrator(context);
         }
 
         return sto;
     }
 
-    private Orchestrator()
+    static public Orchestrator singleton()
     {
-        deviceScanCallBack = new DeviceScanCallBack();
+        return sto;
+    }
+
+    private Orchestrator(Context context)
+    {
+        /* Context used only to get the current ble adapter */
+        deviceHost = new DeviceHost(context);
+        deviceScanCallBack = new DeviceScanCallBack(deviceHost);
         deviceWithObserversMap = new HashMap<BluetoothDevice, DeviceWithObservers>();
     }
 
-    public void setContext(Context _context)
+    public DeviceHost getDeviceHost()
     {
-        context = _context;
-        if (deviceHost == null && _context != null) {
-            deviceHost = new DeviceHost(_context);
-        }
+        return deviceHost;
     }
 
-    public DeviceHost getDeviceHost() { return deviceHost; }
+    public DeviceScanCallBack getDeviceScanCallBack()
+    {
+        return deviceScanCallBack;
+    }
 
     public void startScan()
     {
@@ -64,11 +69,18 @@ public class Orchestrator {
         deviceHost.stopScan(deviceScanCallBack);
     }
 
-    public void connectToDevice(BluetoothDevice blueDev)
+    public void connectToDevice(Context context, BluetoothDevice blueDev)
     {
         DeviceWithObservers dwo = deviceWithObserversMap.get(blueDev);
+        if (dwo == null)
+        {
+            dwo = new DeviceWithObservers(blueDev, getDeviceHost());
+            deviceWithObserversMap.put(blueDev, dwo);
+        }
+
         if (dwo != null)
         {
+            Log.i(TAG, "connectToDev: connectGatt");
             blueDev.connectGatt(context, false, dwo);
             stopScan();
         }
@@ -102,7 +114,7 @@ public class Orchestrator {
         DeviceWithObservers dwo = deviceWithObserversMap.get(blueDev);
         if (dwo == null)
         {
-            dwo = new DeviceWithObservers(blueDev);
+            dwo = new DeviceWithObservers(blueDev, getDeviceHost());
             deviceWithObserversMap.put(blueDev, dwo);
         }
         Log.i(TAG, String.format("addObserve %s<=%s:", blueDev.getAddress(), observer));
@@ -135,20 +147,20 @@ public class Orchestrator {
         return ret;
     }
 
-    /* TODO: Add service as parameter? */
+    /* TODO: Add service as parameter?
     public List<BluetoothGattCharacteristic> getCharacteristics(BluetoothDevice blueDev)
     {
         List<BluetoothGattCharacteristic> ret = null;
 
         DeviceWithObservers dwo = deviceWithObserversMap.get(blueDev);
         Log.d(TAG, String.format("getChList dwo = %s", dwo));
-        if (dwo != null /*&& dwo.getGattConnection() != null*/)
+        if (dwo != null *&& dwo.getGattConnection() != null*)
         {
             ret = dwo.getCharacteristicsList();
         }
 
         return ret;
-    }
+    }*/
 
     public BluetoothGattCharacteristic getCharacteristic(BluetoothDevice blueDev, String uuid)
     {
@@ -158,7 +170,7 @@ public class Orchestrator {
         Log.d(TAG, String.format("getChar dwo = %s", dwo));
         if (dwo != null && dwo.getGattConnection() != null) {
             /* Lookup Characteristic */
-            for (BluetoothGattCharacteristic gattCh: dwo.getCharacteristicsList())
+            for (BluetoothGattCharacteristic gattCh: dwo.cloneCharacteristicList())
             {
                 if (gattCh.getUuid().compareTo(UUID.fromString(uuid)) == 0)
                 {
@@ -170,21 +182,59 @@ public class Orchestrator {
         return ret;
     }
 
-    public boolean readCharacteristic(BluetoothDevice blueDev, String uuid) {
+    public byte[] readValue(String devAddr, String uuid)
+    {
+        byte[] ret = null;
+        DeviceWithObservers dwo = deviceWithObserversMap.get(getDeviceWithAddress(devAddr));
 
+        if (dwo != null)
+        {
+            /* Lookup Characteristic */
+            BluetoothGattCharacteristic gattCh = getCharacteristic(dwo.getBluetoothDevice(), uuid);
+
+            if (gattCh != null)
+            {
+                ret = gattCh.getValue();
+            }
+            else
+            {
+                Log.e(TAG, String.format("readValue: no characteristic found with id %s!", uuid));
+            }
+        }
+        else
+        {
+            Log.e(TAG, "readValue: no device with addr "+devAddr);
+        }
+
+        return ret;
+    }
+
+    public boolean readCharacteristic(BluetoothDevice blueDev, String uuid)
+    {
         boolean ret = false;
 
         DeviceWithObservers dwo = deviceWithObserversMap.get(blueDev);
-        if (dwo != null && dwo.getGattConnection() != null) {
+        if (dwo != null && dwo.getGattConnection() != null)
+        {
             /* Lookup Characteristic */
             BluetoothGattCharacteristic gattCh = getCharacteristic(blueDev, uuid);
 
-            if (gattCh != null) {
+            if (gattCh != null)
+            {
                 ret = dwo.getGattConnection().readCharacteristic(gattCh);
-                if (!ret) {
+                if (!ret)
+                {
                     Log.e(TAG, String.format("readChar Failed for dev %s %s", blueDev.getAddress(), gattCh.getUuid()));
                 }
             }
+            else
+            {
+                Log.e(TAG, String.format("readChar Failed for dev %s: char not yet present %s", blueDev.getAddress(), gattCh.getUuid()));
+            }
+        }
+        else
+        {
+            Log.e(TAG, String.format("readChar no des found, dwo %s, gattConn %s", dwo, dwo.getGattConnection()));
         }
 
         return ret;
@@ -234,5 +284,110 @@ public class Orchestrator {
                 des.setCharacteristic(gattChar);
             }
         }
+    }
+
+    /* null mean Unknown */
+    public Integer getConnectionStatus(BluetoothDevice deviceObj)
+    {
+        Integer ret = null;
+
+        DeviceWithObservers dwo = deviceWithObserversMap.get(deviceObj);
+        if (dwo != null)
+        {
+            ret = dwo.getConnectionStatus();
+        }
+
+        return ret;
+    }
+
+    public BluetoothDevice getDeviceWithAddress(String mac)
+    {
+        BluetoothDevice ret = null;
+
+        for (HashMap.Entry<BluetoothDevice, DeviceWithObservers> entry : deviceWithObserversMap.entrySet()) {
+            BluetoothDevice deviceObj = entry.getKey();
+            DeviceWithObservers dwo = entry.getValue();
+
+            if (mac !=null && deviceObj != null && deviceObj.getAddress()!=null && deviceObj.getAddress().equals(mac))
+            {
+                ret = deviceObj;
+                break;
+            }
+        }
+
+        return ret;
+    }
+
+    public Integer getConnectionStatus(String devAddr)
+    {
+        Integer ret = null;
+
+        BluetoothDevice deviceObj = Orchestrator.singleton().getDeviceWithAddress(devAddr);
+        ret = Orchestrator.singleton().getConnectionStatus(deviceObj);
+
+        Log.i(TAG, String.format("getConnSt: deviceObj %s, connStatus %d/%s", deviceObj, ret == null ? 0 : ret.intValue(), ret));
+
+        return ret;
+
+    }
+
+    public boolean isConnected(String devAddr)
+    {
+        Integer connStatus = getConnectionStatus(devAddr);
+
+        return (connStatus != null && connStatus == BluetoothProfile.STATE_CONNECTED);
+    }
+
+    public BluetoothGatt gattConnection(String devAddr)
+    {
+        BluetoothGatt ret = null;
+        DeviceWithObservers dwo = deviceWithObserversMap.get(getDeviceWithAddress(devAddr));
+
+        if (dwo != null)
+        {
+            ret = dwo.getGattConnection();
+        }
+
+        return ret;
+    }
+
+    public boolean readRssi(String devAddr)
+    {
+        boolean ret = false;
+        DeviceWithObservers dwo = deviceWithObserversMap.get(getDeviceWithAddress(devAddr));
+
+        if (dwo != null)
+        {
+            ret = dwo.getGattConnection().readRemoteRssi();
+
+            if (!ret)
+            {
+                Log.e(TAG, "readRssi: not requested!");
+            }
+        }
+        else
+        {
+            Log.e(TAG, "readRssi: no device with addr "+devAddr);
+        }
+
+        return ret;
+    }
+
+    public boolean setNotification(String devAddr, String uuid)
+    {
+        boolean ret = false;
+        BluetoothGattCharacteristic ch = getCharacteristic(getDeviceWithAddress(devAddr), uuid);
+
+        Log.i(TAG, String.format("setNotification(%s,%s)", devAddr, uuid));
+        if (ch != null)
+        {
+            //
+        }
+        else
+        {
+            Log.e(TAG, "setNotification: no device/characteristic found!"+devAddr+"/"+uuid);
+        }
+
+        return ret;
     }
 }

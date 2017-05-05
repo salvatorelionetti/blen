@@ -17,6 +17,8 @@ import java.util.Set;
 public class Utils {
     final protected static char[] hexArray = "0123456789ABCDEF ".toCharArray();
     final private static String TAG = "Utils";
+    final private static boolean logEna = false;
+
     public static String bytesToHex(byte[] bytes) {
 
         if (bytes == null)
@@ -83,8 +85,12 @@ public class Utils {
     {
         SharedPreferences pref;
 
-        pref = PreferenceManager.getDefaultSharedPreferences(context);
+        pref = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext());
 
+        if (logEna)
+        {
+            Log.i(TAG, String.format("setPref [%s]<=%s %s", key, val, context.getApplicationContext()));
+        }
         pref.edit().putString(key, val).commit();
     }
 
@@ -92,26 +98,67 @@ public class Utils {
     {
         SharedPreferences pref;
 
-        pref = PreferenceManager.getDefaultSharedPreferences(context);
+        pref = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext());
 
+        if (logEna)
+        {
+            Log.i(TAG, String.format("setPref [%s]<=%d %s", key, val, context.getApplicationContext()));
+        }
         pref.edit().putLong(key, val).commit();
     }
 
     public static String getPrefString(Context context, String key)
     {
+        String val;
         SharedPreferences pref;
 
-        pref = PreferenceManager.getDefaultSharedPreferences(context);
+        pref = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext());
 
-        return pref.getString(key, "");
+        val = pref.getString(key, null);
+
+        if (logEna)
+        {
+            Log.i(TAG, String.format("getPref [%s]=>%s %s", key, val, context.getApplicationContext()));
+        }
+
+        return val;
     }
 
     public static long getPrefLong(Context context, String key)
     {
+        long val;
+
         SharedPreferences pref;
 
-        pref = PreferenceManager.getDefaultSharedPreferences(context);
+        pref = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext());
 
-        return pref.getLong(key, 0);
+        val = pref.getLong(key, 0);
+
+        if (logEna)
+        {
+            Log.i(TAG, String.format("getPref [%s]=>%s %s", key, val, context.getApplicationContext()));
+        }
+
+        return val;
     }
+
+    public static boolean getPrefBool(Context context, String key)
+    {
+        boolean val;
+
+        SharedPreferences pref;
+
+        pref = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext());
+
+        val = pref.getBoolean(key, false);
+
+        if (logEna)
+        {
+            Log.i(TAG, String.format("getPref [%s]=>%s %s", key, val, context.getApplicationContext()));
+        }
+
+        return val;
+    }
+
+
 }

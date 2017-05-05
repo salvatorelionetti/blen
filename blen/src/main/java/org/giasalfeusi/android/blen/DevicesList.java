@@ -4,12 +4,11 @@ package org.giasalfeusi.android.blen;
 import android.bluetooth.BluetoothDevice;
 import android.util.Log;
 
-//import org.giasalfeusi.blewithbeaconlib.ObservableAllPublic;
-
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Observer;
+
+//import org.giasalfeusi.blewithbeaconlib.ObservableAllPublic;
 
 /**
  * Created by salvy on 10/03/17.
@@ -35,25 +34,16 @@ public class DevicesList<B> extends ArrayList<BluetoothDevice> {
 
     private static final String TAG = "DevList";
 
-    private static DevicesList devicesList = null;
-
     private ObservableAllPublic observable = null;
 
-    /* Why constructor is required by singleton initialization? */
-    public DevicesList(Collection<BluetoothDevice> c)
+    /* Dependency inject */
+    private DeviceHost deviceHost = null;
+
+    public DevicesList(Collection<BluetoothDevice> c, DeviceHost dh)
     {
         super(c);
         observable = new ObservableAllPublic();
-    }
-
-    public static DevicesList singleton()
-    {
-        if (devicesList == null) {
-
-            BluetoothDevice[] _devices = {};
-            devicesList = new DevicesList(Arrays.asList(_devices));
-        }
-        return devicesList;
+        deviceHost = dh;
     }
 
     public void replaceAll(Collection<BluetoothDevice> elements)
@@ -71,19 +61,35 @@ public class DevicesList<B> extends ArrayList<BluetoothDevice> {
         ret = super.add(object);
         if (ret)
         {
+            Log.i(TAG, String.format("add(%s) notifying", object));
             observable.setChanged();
             observable.notifyObservers(object);
+
+            deviceHost.notifyChanged(object);
         }
 
         return ret;
     }
 
+    public void stateChanged(BluetoothDevice object)
+    {
+        if (super.contains(object))
+        {
+            observable.setChanged();
+            observable.notifyObservers(object);
+        }
+    }
+
     /* Proxy part */
-    public void addObserver(Observer observer) {
+    public void addObserver(Observer observer)
+    {
+        Log.i(TAG, String.format("addObserver %s", observer));
         observable.addObserver(observer);
     }
 
-    public void delObserver(Observer observer) {
+    public void delObserver(Observer observer)
+    {
+        Log.i(TAG, String.format("delObserver %s", observer));
         observable.deleteObserver(observer);
     }
 }
