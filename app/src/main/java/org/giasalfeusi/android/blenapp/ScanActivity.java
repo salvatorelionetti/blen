@@ -14,7 +14,6 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.Toast;
 
-import org.giasalfeusi.android.blen.DevicesList;
 import org.giasalfeusi.android.blen.Orchestrator;
 import org.giasalfeusi.android.blen.Utils;
 
@@ -33,6 +32,7 @@ public class ScanActivity extends AppCompatActivity implements Observer, Adapter
 
     /* V: View */
     private ListView devicesListView;
+    private FloatingActionButton fab;
 
     /* C: Controller/Adapter/Activity */
     private DeviceListAdapter adapter;
@@ -44,7 +44,8 @@ public class ScanActivity extends AppCompatActivity implements Observer, Adapter
         setContentView(R.layout.activity_main);
 
         /* Must be called before to ask to DeviceHost */
-        Orchestrator.singleton().setContext(this); /* What a wrong if */
+        Orchestrator.singletonInitialize(this.getApplicationContext());
+
         ensureBle();
 
         long nextTick = Utils.getPrefLong(this, "nextTick");
@@ -52,14 +53,14 @@ public class ScanActivity extends AppCompatActivity implements Observer, Adapter
 
 //        this.sendBroadcast(new Intent("org.giasalfeusi.ble.gui"));
 
-        DevicesList.singleton().addObserver(this);
+        Orchestrator.singleton().getDeviceHost().getDevicesList().addObserver(this);
 
-        adapter = new DeviceListAdapter(this, DevicesList.singleton());
+        adapter = new DeviceListAdapter(this, Orchestrator.singleton().getDeviceHost().getDevicesList());
         devicesListView = (ListView) findViewById(R.id.deviceListViewId);
         devicesListView.setAdapter(adapter);
         devicesListView.setOnItemClickListener(this);
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.startScanButton);
+        /*FloatingActionButton */fab = (FloatingActionButton) findViewById(R.id.startScanButton);
         fab.setOnClickListener(this);
     }
 
@@ -68,7 +69,6 @@ public class ScanActivity extends AppCompatActivity implements Observer, Adapter
     {
         super.onResume();
         Log.i(TAG, String.format("onResume %s", this));
-        Orchestrator.singleton().setContext(this); /* What a wrong if */
     }
 
     @Override
@@ -77,14 +77,11 @@ public class ScanActivity extends AppCompatActivity implements Observer, Adapter
         super.onPause();
         Log.i(TAG, String.format("onPause %s", this));
         Orchestrator.singleton().stopScan();
-        Orchestrator.singleton().setContext(null);
  //       this.sendBroadcast(new Intent("org.giasalfeusi.ble.bg"));
     }
 
     @Override
     public void onClick(View view) {
-        Snackbar.make(view, "Starting BLE scanning", Snackbar.LENGTH_SHORT)
-                .setAction("Action", null).show();
         startScan();
     }
 
@@ -117,18 +114,24 @@ public class ScanActivity extends AppCompatActivity implements Observer, Adapter
                 this.startScan();
             } else {
                 //Bluetooth not enabled.
-                finish();
                 return;
             }
         }
         super.onActivityResult(requestCode, resultCode, data);
     }
 
+    private void showStartScan()
+    {
+        Snackbar.make(fab, "Starting BLE scanning", Snackbar.LENGTH_SHORT)
+                .setAction("Action", null).show();
+
+    }
     private void startScan() {
         if (!Orchestrator.singleton().getDeviceHost().isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             this.startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
         } else {
+            showStartScan();
             Orchestrator.singleton().startScan();
         }
     }

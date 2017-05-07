@@ -59,7 +59,7 @@ public class DeviceActivity extends AppCompatActivity implements Observer, Adapt
          * 1) set context
          * 2) observe device
          */
-        Orchestrator.singleton().setContext(this); /* What a wrong if */
+        Orchestrator.singletonInitialize(this); /* Not captured */
         Orchestrator.singleton().observeDevice(deviceObj, this);
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -67,7 +67,7 @@ public class DeviceActivity extends AppCompatActivity implements Observer, Adapt
 
         content_main2_view = (View) findViewById(R.id.content_main2);
 
-        adapter = new DeviceAttrAdapter(this, Orchestrator.singleton().getCharacteristics(deviceObj));
+        adapter = new DeviceAttrAdapter(this, Orchestrator.singleton().getCharacteristicsList(deviceObj));
 
         characteristicsListView = (ListView) ((ViewGroup)content_main2_view).getChildAt(1);
         characteristicsListView.setAdapter(adapter);
@@ -90,9 +90,8 @@ public class DeviceActivity extends AppCompatActivity implements Observer, Adapt
     {
         super.onResume();
         Log.i(TAG, String.format("onResume %s", this));
-        Orchestrator.singleton().setContext(this); /* What a wrong if */
         Orchestrator.singleton().observeDevice(deviceObj, this);
-        Orchestrator.singleton().connectToDevice(deviceObj);
+        Orchestrator.singleton().connectToDevice(this.getApplicationContext(), deviceObj);
     }
 
     @Override
@@ -101,7 +100,6 @@ public class DeviceActivity extends AppCompatActivity implements Observer, Adapt
         super.onPause();
         Log.i(TAG, String.format("onPause %s", this));
         //sto.disconnectFromDevice(deviceObj);
-        Orchestrator.singleton().setContext(null); /* What a wrong if */
         Orchestrator.singleton().noMoreObserveDevice(deviceObj, this);
     }
 
@@ -202,7 +200,7 @@ public class DeviceActivity extends AppCompatActivity implements Observer, Adapt
             case BluetoothProfile.STATE_DISCONNECTING:
             case BluetoothProfile.STATE_DISCONNECTED:
                 msg = "Start Connecting";
-                Orchestrator.singleton().connectToDevice(deviceObj);
+                Orchestrator.singleton().connectToDevice(this.getApplicationContext(), deviceObj);
                 break;
             default:
                 msg = "Status is unknown " + newStatus;
@@ -217,7 +215,7 @@ public class DeviceActivity extends AppCompatActivity implements Observer, Adapt
     public void onItemClick(AdapterView<?> parent, View view,
                             int position, long id) {
         Log.d(TAG, String.format("onItemClick pos %d", position));
-        Orchestrator.singleton().readCharacteristic(deviceObj, Orchestrator.singleton().getCharacteristics(deviceObj).get(position));
+        Orchestrator.singleton().readCharacteristic(deviceObj, Orchestrator.singleton().getCharacteristicsList(deviceObj).get(position));
         return;
     }
 
@@ -225,7 +223,7 @@ public class DeviceActivity extends AppCompatActivity implements Observer, Adapt
     public boolean onItemLongClick(AdapterView<?> parent, View view,
                                 int position, long id)
     {
-        BluetoothGattCharacteristic ch = Orchestrator.singleton().getCharacteristics(deviceObj).get(position);
+        BluetoothGattCharacteristic ch = Orchestrator.singleton().getCharacteristicsList(deviceObj).get(position);
         Log.d(TAG, String.format("onItemLongClick pos %d val %s", position, ch.getValue()));
         if (ch.getValue() == null)
         {
